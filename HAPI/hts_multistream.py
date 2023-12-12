@@ -87,7 +87,6 @@ def get_parser():
     parser.add_argument('--sig_gen', default=None, help='Signal gen to trigger when all uuts armed')
     parser.add_argument('--delete', default=1, type=int, help='delete stale data')
     parser.add_argument('--recycle', default=1, type=int, help='overwrite data')
-    parser.add_argument('--check_spad', default=0, type=int, help='check spad is sequential')
     parser.add_argument('--dry_run', default=0, type=int, help='run setup but dont start streams or uuts')
     parser.add_argument('-wr', '--wrtd_txi', default=None, help='Command first box to send this trigger when all units are in ARM state')
     parser.add_argument('-d0', '--SIG_SRC_TRG_0', default=None, help='Set trigger d0 source')
@@ -98,6 +97,11 @@ def get_parser():
     parser.add_argument('--hex_str', default=0, type=int, help='generate hexdump cmd')
     parser.add_argument('--cpu_usage', default=0, help='display cpu usage and mean')
     parser.add_argument('--auto', default=0, type=int, help='auto set nbuffer based on space')
+    parser.add_argument('--concat', default=0, type=int, help='num buffers to concat together')
+
+    validations = parser.add_mutually_exclusive_group()
+    validations.add_argument('--check_spad', default=0, type=int, help='check spad is sequential')
+    validations.add_argument('--check_ramp', default=0, type=int, help='check ramp is sequential')
     
     parser.add_argument('uutnames', nargs='+', help="uuts")
     return parser
@@ -173,6 +177,13 @@ class UutWrapper:
 
                 step = 1 if self.args.decimate is None else self.args.decimate
                 cmd = stream.get_checker_cmd(self.args, spad_len, data_columns, step)
+            elif self.args.check_ramp > 0:
+                print(self.api.sites) # 6
+                print(data_columns) #48
+                step = data_columns / len(self.api.sites)
+                print(step)
+                count_column = self.args.check_ramp - 1
+                cmd = stream.get_checker_cmd(self.args, spad_len, data_columns, step, count_column)
             else:
                 cmd = stream.get_cmd(self.args)
             if self.args.verbose > 0:
@@ -291,13 +302,15 @@ class Stream:
 
     def get_cmd(self, args):
         os.system(f"sudo mkdir -p {self.outroot} -m 0777")
-        cmd = f"sudo RTM_DEVNUM={self.lport} NBUFS={args.nbuffers} CONCAT=0 RECYCLE={args.recycle} OUTROOT={self.outroot} ./STREAM/rtm-t-stream-disk"
+        cmd = f"sudo RTM_DEVNUM={self.lport} NBUFS={args.nbuffers} CONCAT={args.concat} RECYCLE={args.recycle} OUTROOT={self.outroot} ./STREAM/rtm-t-stream-disk"
         return cmd
         
-    def get_checker_cmd(self, args, spad_len, data_columns, step):
+    def get_checker_cmd(self, args, spad_len, data_columns, step, count_column = None):
         total_columns = data_columns + spad_len
+        if not count_column:
+            count_column = data_columns
         cmd = self.get_cmd(args)
-        cmd += f' | ./FUNCTIONAL_TESTS/isramp -N1 -m {total_columns} -c {data_columns} -s {step} -i 1 -L {self.logfile}'
+        cmd += f' | ./FUNCTIONAL_TESTS/isramp -N1 -m {total_columns} -c {count_column} -s {step} -i 1 -L {self.logfile}'
         os.system(f"umask 000 ; touch {self.logfile}")
         return cmd
         
