@@ -161,24 +161,35 @@ class UutWrapper:
                 PR.Red('Link down: unable to fix')
                 os._exit(1)
 
-            data_columns = int(sum(stream.sites.values()) / 2)
+            chans = sum(stream.sites.values())
+            chans32 = chans if self.api.data_size() == 4 else int(chans / 2)
             spad_len = int(self.spad.split(',')[1])
 
+
             if self.args.hex_str:
-                hex_cmd = f"""Hex Cmd: hexdump -e '{data_columns + spad_len}/4 "%08x," "\\n"' /mnt/afhba.{lport}/{stream.rhost}/000000/{lport}.00"""
-                PR.Cyan(hex_cmd)
+                cycle = 0 if int(self.args.recycle) > 0 else 1
+                first_buffer = f"/mnt/afhba.{lport}/{stream.rhost}/00000{cycle}/{lport}.00"
+                self.generate_hexdump_cmd(chans, spad_len, first_buffer)
 
             if self.args.check_spad > 0:
                 if not self.spad_enabled:
                    die(f'Error: Cannot check spad if no spad: {self.spad}')
 
                 step = 1 if self.args.decimate is None else self.args.decimate
-                cmd = stream.get_checker_cmd(self.args, spad_len, data_columns, step)
+                cmd = stream.get_checker_cmd(self.args, spad_len, chans32, step)
             else:
                 cmd = stream.get_cmd(self.args)
             if self.args.verbose > 0:
                 print(f"Cmd: {cmd}")
             stream.run(cmd)
+
+    def generate_hexdump_cmd(self, channels, spad_len, filename):
+        #Generates hexdump cmd for data
+        spad_cmd = f'{spad_len}/4 "%08x,"' if spad_len > 0 else ''
+        data_size = self.api.data_size()
+        size_in_hex = data_size * 2
+        hex_cmd = f"""hexdump -e '{channels}/{data_size} "%0{size_in_hex}x," {spad_cmd} "\\n"'  {filename}"""
+        print(hex_cmd)
 
     def configure(self):
         if self.spad is not None:
