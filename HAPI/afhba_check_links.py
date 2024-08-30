@@ -22,42 +22,71 @@ def get_parser():
     parser.add_argument('uutnames', nargs='*', help="uuts to check. Omit to check all connections")
     return parser
 
-def run_main(args):
-    check_lanes(args.uutnames)
-
-def check_lanes(uuts):
+def get_connections():
+    connections = {}
     for conn in afhba404.get_connections().values():
-        if conn.uut in uuts or len(uuts) == 0:
-            check_lane_status(conn.uut, conn.dev, conn.cx)
+        connections.setdefault(conn.uut, {})[conn.cx] = conn.dev
+    return connections
 
-def check_lane_status(uutname, lport, rport, uut=None, verbose=True):
-    def output(msg):
-        if verbose:
-            print(msg)
-    link_state = afhba404.get_link_state(lport)
-    if link_state.LANE_UP and link_state.RPCIE_INIT:
-        output(f"[{uutname}:{rport} -> afhba.{lport}] Link Good")
-        return True
-    if not uut:
+def check_links(uuts):
+    connections = get_connections()
+
+    for uutname in uuts:
+        if uutname not in connections:
+            if not reset_link(uutname):
+                continue
+
+    for uutname, ports in connections.items():
+        for rport, lport in ports.items():
+            check_lane(uutname, rport, lport)
+            if uutname in uuts or len(uuts) == 0:
+                check_lane(uutname, rport, lport)
+        
+def reset_link(uutname):
+    print(f"[{uutname}] Resetting Link")
+
+    try:
         uut = acq400_hapi.factory(uutname)
-    comm_api = getattr(uut, f'c{rport}')
-    if not hasattr(comm_api, 'TX_DISABLE'):
-        output(f"[{uutname}:{rport} -> afhba.{lport}] Link down: unable to fix (old firmware)")
+        if not hasattr(uut['A'], 'TX_DISABLE'):
+            print(f"[{uutname}] Warning old firmware")
+            return False
+    except: 
+        print(f"[{uutname}] No route to host")
         return False
-    output(f"[{uutname}:{rport} -> afhba.{lport}] Link Down: attempting fix")
+
     attempt = 1
     while attempt <= 5:
-        comm_api.TX_DISABLE = 1
-        time.sleep(0.5)
-        comm_api.TX_DISABLE = 0
-        time.sleep(0.5)
+        for rport in ['A', 'B']:
+            try:
+                uut[rport].TX_DISABLE = 1
+                time.sleep(0.5)
+                uut[rport].TX_DISABLE = 0
+                time.sleep(0.5)
+            except: pass
+        connections = get_connections()
+        if uutname in connections:
+            print(f"[{uutname}] Link connected")
+            return True
+    print(f"[{uutname}] Link down")
+    return False
+
+def check_lane(uutname, rport, lport):
+    link_state = afhba404.get_link_state(lport)
+    if link_state.LANE_UP and link_state.RPCIE_INIT:
+        print(f"[{uutname}:{rport} -> afhba.{lport}] Link Good")
+        return True
+    reset_link(uutname)
+    try:
         link_state = afhba404.get_link_state(lport)
         if link_state.RPCIE_INIT:
-            output(f'[{uutname}:{rport} -> afhba.{lport}] Link Fixed')
+            print(f'[{uutname}:{rport} -> afhba.{lport}] Link Fixed')
             return True
-        attempt += 1
-    output(f'[{uutname}:{rport} -> afhba.{lport}] Link down: unable to fix')
-    return False  
+    except: pass
+    print(f"[{uutname}] Link down")
+    return False
+
+def run_main(args):
+    check_links(args.uutnames)
 
 if __name__ == '__main__':
     run_main(get_parser().parse_args())
