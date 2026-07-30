@@ -57,6 +57,10 @@ def main():
     min_data = min_data.astype(float) * 15 /1000
     max_data = max_data.astype(float) * 15 /1000
 
+    print("Overall Mean    = %.2fus" % np.mean(mean_data))
+    print("Maximum Latency = %.2fus" % max(max_data))
+    print("Minimum Latency = %.2fus" % min(min_data))
+
     fig, axs = plt.subplots(1, 5, sharey=False, sharex=False, tight_layout=True)
 
     lo, hi = min(latest_data), max(latest_data)
