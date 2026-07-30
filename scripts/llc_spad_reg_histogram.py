@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 import acq400_hapi
@@ -59,26 +59,50 @@ def main():
 
     fig, axs = plt.subplots(1, 5, sharey=False, sharex=False, tight_layout=True)
 
-    num_bins = np.arange(min(latest_data), max(latest_data), (max(latest_data) - min(latest_data))/np.sqrt(len(latest_data)))
+    lo, hi = min(latest_data), max(latest_data)
+    if lo == hi:
+        num_bins = max(1, int(np.sqrt(len(latest_data))))
+    else:
+        num_bins = np.arange(lo, hi, (hi - lo)/np.sqrt(len(latest_data)))
     axs[0].hist(latest_data, bins=num_bins)
-    axs[0].title.set_text("histogram of latest data")
+    axs[0].title.set_text("latest latency")
 
-    num_bins = np.arange(min(mean_data), max(mean_data), (max(mean_data) - min(mean_data))/np.sqrt(len(mean_data)))
+    lo, hi = min(mean_data), max(mean_data)
+    if lo == hi:
+        num_bins = max(1, int(np.sqrt(len(mean_data))))
+    else:
+        num_bins = np.arange(lo, hi, (hi - lo)/np.sqrt(len(mean_data)))
     axs[1].hist(mean_data, bins=num_bins)
-    axs[1].title.set_text("histogram of average data")
+    axs[1].title.set_text("mean latency")
 
-    num_bins = np.arange(min(min_data), max(min_data), (max(min_data) - min(min_data))/np.sqrt(len(min_data)))
+    lo, hi = min(min_data), max(min_data)
+    if lo == hi:
+        num_bins = max(1, int(np.sqrt(len(min_data))))
+    else:
+        num_bins = np.arange(lo, hi, (hi - lo)/np.sqrt(len(min_data)))
     axs[2].hist(min_data, bins=num_bins)
-    axs[2].title.set_text("histogram of min data")
+    axs[2].title.set_text("min latency")
 
-    num_bins = np.arange(min(max_data), max(max_data), (max(max_data) - min(max_data))/np.sqrt(len(max_data)))
+    lo, hi = min(max_data), max(max_data)
+    if lo == hi:
+        num_bins = max(1, int(np.sqrt(len(max_data))))
+    else:
+        num_bins = np.arange(lo, hi, (hi - lo)/np.sqrt(len(max_data)))
     axs[3].hist(max_data, bins=num_bins)
-    axs[3].title.set_text("histogram of max data")
+    axs[3].title.set_text("max latency")
 
-    num_bins = np.arange(min(latest_data), max(latest_data), (max(latest_data)-min(latest_data))/np.sqrt(len(latest_data)))
+    lo, hi = min(latest_data), max(latest_data)
+    if lo == hi:
+        num_bins = max(1, int(np.sqrt(len(latest_data))))
+    else:
+        num_bins = np.arange(lo, hi, (hi - lo)/np.sqrt(len(latest_data)))
     axs[4].hist(latest_data, bins=num_bins)
-    axs[4].title.set_text('histogram of latest data on a log scale')
-    axs[4].set_yscale('log', nonposy='clip')
+    axs[4].title.set_text('latest latency (log Y)')
+    axs[4].set_yscale('log', nonpositive='clip')
+
+    for ax in axs:
+        ax.set_xlabel('Latency (us)')
+        ax.set_ylabel('Count')
 
     plt.show()
     return None
@@ -86,4 +110,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
